@@ -30,6 +30,9 @@ require('prismjs/components/prism-gherkin')
 require('./lib/common/login')
 require('./locale')
 require('../vendor/md-toc')
+var Viz = require('viz.js')
+var plantumlEncoder = require('plantuml-encoder')
+
 const ui = getUIElements()
 
 // auto update last change
@@ -333,6 +336,32 @@ export function finishView (view) {
       console.warn(err)
     }
   })
+  const plantumlServer = "http://www.plantuml.com/plantuml"
+  const makePlantumlURL = (umlCode) => {
+    let format = 'svg'
+    let code = plantumlEncoder.encode(umlCode)
+    return `${plantumlServer}/${format}/${code}`
+  }
+  const plantumls = view.find('div.plantuml.raw').removeClass('raw')
+  plantumls.each((_, value) => {
+    const $value = $(value)
+    const $ele = $(value).closest('pre').parent()
+    try {
+      let code = $value.text()
+      if($value[0].classList.contains("plantuml-mensch")) {
+        code = code.replace(/(.*)\n(.*)/g, '$1 -> $2\n$2')
+        code = code.substring(0, code.lastIndexOf("\n"))
+      }
+      let url = makePlantumlURL(code)
+      $ele.html(`<img class="plantuml" src="${url}" />${code}`)
+      $ele.addClass('plantuml')
+      //$ele.setAttribute('viewBox', `0 0 ${svg.attr('width')} ${svg.attr('height')}`)
+    } catch (err) {
+      $value.unwrap()
+      $value.parent().append(`<div class="alert alert-warning">${escapeHTML(err)}</div>`)
+      console.warn(err)
+    }
+  })
   // flowchart
   const flow = view.find('div.flow-chart.raw').removeClass('raw')
   flow.each((key, value) => {
@@ -345,7 +374,7 @@ export function finishView (view) {
       $value.html('')
       chart.drawSVG(value, {
         'line-width': 2,
-        fill: 'none',
+        'fill': 'none',
         'font-size': '16px',
         'font-family': "'Andale Mono', monospace"
       })
@@ -990,6 +1019,8 @@ function highlightRender (code, lang) {
   code = S(code).escapeHTML().s
   if (lang === 'sequence') {
     return `<div class="sequence-diagram raw">${code}</div>`
+  } else if (lang.startsWith('plantuml')) {
+    return `<div class="plantuml raw ${lang}">${code}</div>`
   } else if (lang === 'flow') {
     return `<div class="flow-chart raw">${code}</div>`
   } else if (lang === 'graphviz') {
@@ -1048,10 +1079,6 @@ md.use(require('markdown-it-imsize'))
 
 md.use(require('markdown-it-emoji'), {
   shortcuts: {}
-})
-
-md.use(require('markdown-it-plantuml'), {
-  server: plantumlServer
 })
 
 window.emojify.setConfig({

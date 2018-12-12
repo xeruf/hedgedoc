@@ -1,6 +1,6 @@
 /* eslint-env browser, jquery */
 /* eslint no-console: ["error", { allow: ["warn", "error"] }] */
-/* global moment, serverurl */
+/* global moment, serverurl, plantumlServer */
 
 import Prism from 'prismjs'
 import PDFObject from 'pdfobject'
@@ -1048,6 +1048,10 @@ md.use(require('markdown-it-imsize'))
 
 md.use(require('markdown-it-emoji'), {
   shortcuts: {}
+})
+
+md.use(require('markdown-it-plantuml'), {
+  server: plantumlServer
 })
 
 window.emojify.setConfig({

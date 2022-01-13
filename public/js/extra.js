@@ -30,8 +30,10 @@ require('prismjs/components/prism-gherkin')
 require('./lib/common/login')
 require('./locale')
 require('../vendor/md-toc')
-var Viz = require('viz.js')
-var plantumlEncoder = require('plantuml-encoder')
+
+const Viz = require('viz.js')
+const plantumlEncoder = require('plantuml-encoder')
+const plantumlServer = "http://www.plantuml.com/plantuml"
 
 const ui = getUIElements()
 
@@ -336,7 +338,6 @@ export function finishView (view) {
       console.warn(err)
     }
   })
-  const plantumlServer = "http://www.plantuml.com/plantuml"
   const makePlantumlURL = (umlCode) => {
     let format = 'svg'
     let code = plantumlEncoder.encode(umlCode)
@@ -349,11 +350,12 @@ export function finishView (view) {
     try {
       let code = $value.text()
       if($value[0].classList.contains("plantuml-mensch")) {
-        code = code.replace(/(.*)\n(.*)/g, '$1 -> $2\n$2')
-        code = code.substring(0, code.lastIndexOf("\n"))
+        code = code.replace(/^(.*)\n /mg, '$1\n\t$1 -> ')
+        code = code.replace(/^([^\t].*)$/mg, '[*] -> $1')
+        console.log("Converted code:\n" + code)
       }
-      let url = makePlantumlURL(code)
-      $ele.html(`<img class="plantuml" src="${url}" />${code}`)
+      let url = makePlantumlURL("hide empty description\n" + code)
+      $ele.html(`<img class="plantuml" src="${url}" />`)
       $ele.addClass('plantuml')
       //$ele.setAttribute('viewBox', `0 0 ${svg.attr('width')} ${svg.attr('height')}`)
     } catch (err) {

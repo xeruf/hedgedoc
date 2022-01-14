@@ -206,7 +206,7 @@ body:not(.night) .night {
 
 .ui-scrollable {
     height: 100%;
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: auto;
 }
 .ui-status * {

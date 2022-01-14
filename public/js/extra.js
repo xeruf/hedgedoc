@@ -32,8 +32,9 @@ require('./locale')
 require('../vendor/md-toc')
 
 const Viz = require('viz.js')
+const yaml = require('js-yaml')
 const plantumlEncoder = require('plantuml-encoder')
-const plantumlServer = "http://www.plantuml.com/plantuml"
+const plantumlServer = 'http://localhost:7600'
 
 const ui = getUIElements()
 
@@ -253,6 +254,7 @@ function replaceExtraTags (html) {
   return html
 }
 
+let workingPlantuml
 // dynamic event or object binding here
 export function finishView (view) {
   // todo list
@@ -338,29 +340,59 @@ export function finishView (view) {
       console.warn(err)
     }
   })
-  const makePlantumlURL = (umlCode) => {
-    let format = 'svg'
-    let code = plantumlEncoder.encode(umlCode)
+  function makePlantumlURL(umlCode) {
+    const format = 'svg'
+    const code = plantumlEncoder.encode(umlCode)
     return `${plantumlServer}/${format}/${code}`
   }
   const plantumls = view.find('div.plantuml.raw').removeClass('raw')
   plantumls.each((_, value) => {
     const $value = $(value)
-    const $ele = $(value).closest('pre').parent()
+    const $ele = $(value).closest('pre')
     try {
       let code = $value.text()
       if($value[0].classList.contains("plantuml-mensch")) {
-        code = code.replace(/^(.*)\n /mg, '$1\n\t$1 -> ')
-        code = code.replace(/^([^\t].*)$/mg, '[*] -> $1')
-        console.log("Converted code:\n" + code)
+        let threshold = 3
+        if(code.startsWith("threshold=")) {
+          const newline = code.indexOf('\n')
+          threshold = parseInt(code.substring(10, newline))
+          code = code.substring(newline)
+        }
+        const questions = yaml.load(code)
+        console.log("Parsed:", questions)
+        code = ""
+        for(const question in questions) {
+          const answers = questions[question]
+          const questionsplit = question.split(" - ")
+          if(questionsplit.length > 1)
+            code += questionsplit.join(': ') + '?\n'
+          for(let answer of answers) {
+            let references
+            if(typeof answer === 'object') {
+              references = Object.values(answer)[0]
+              answer = Object.keys(answer)[0]
+            }
+            const id = answer.toString().split(', ')[0].split(' ')[0]
+            code += `state ${id} <<choice>>\n`
+            code += `${questionsplit[0]} --> ${id}: ${answer}\n`
+            if(references) {
+              for(const ref of references) {
+                const refkey = Object.keys(ref)[0]
+                const refvalue = Object.values(ref)[0]
+                if(threshold < 0 || refvalue > 0)
+                  code += `${id} -${refvalue < threshold && '[hidden]' || ''}-> ${refkey}: ${refvalue}\n`
+              }
+            }
+          }
+        }
       }
-      let url = makePlantumlURL("hide empty description\n" + code)
-      $ele.html(`<img class="plantuml" src="${url}" />`)
-      $ele.addClass('plantuml')
-      //$ele.setAttribute('viewBox', `0 0 ${svg.attr('width')} ${svg.attr('height')}`)
+      console.log("Rendering:\n" + code)
+      workingPlantuml = makePlantumlURL("hide empty description\nleft to right direction\n" + code)
+      $ele.html(`<img class="plantuml" style="max-width:unset" src="${workingPlantuml}" />`)
+      $ele.children().unwrap()
     } catch (err) {
-      $value.unwrap()
-      $value.parent().append(`<div class="alert alert-warning">${escapeHTML(err)}</div>`)
+      $ele.html(`<img class="plantuml" style="max-width:unset" src="${workingPlantuml}" />`)
+      $ele.prepend(`<div class="alert alert-warning">${escapeHTML(err)}</div>`)
       console.warn(err)
     }
   })
@@ -397,7 +429,6 @@ export function finishView (view) {
       $value = $(value)
       const $ele = $(value).parent().parent()
       require.ensure([], function (require) {
-        const Viz = require('viz.js')
         const graphviz = Viz($value.text())
         if (!graphviz) throw Error('viz.js output empty graph')
         $value.html(graphviz)
